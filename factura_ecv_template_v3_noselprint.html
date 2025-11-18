@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>FACTURA - ECV SRL</title>
+<style>
+  @page { size: A4; margin: 10mm; }
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; color:#000; margin:0; }
+  .sheet { width: 210mm; min-height: 297mm; padding: 6mm; margin: 0 auto; background:#fff; }
+  h1.title { text-align:center; font-size:22px; font-weight:800; letter-spacing:1px; margin:0; }
+  .num-factura { text-align:right; margin:4px 0 8px; font-size:11px; }
+  .num-factura input[type="text"] {
+    border:none; border-bottom:1px solid #000; width:100px; text-align:center; font-size:11px;
+  }
+  .grid-3 { display:grid; grid-template-columns: 1.25fr 1fr 0.9fr; gap:6px; }
+  .box { border:1px solid #000; padding:6px; }
+  .box h5 { margin:0 0 3px 0; font-size:10px; letter-spacing:.2px; }
+  .box p { margin:0; font-size:10px; }
+  input[type="text"], input[type="number"], input[type="date"] {
+    width:100%; border:none; outline:none; background:transparent; font-size:10px;
+  }
+  .datebox { border:1px solid #000; padding:6px 8px; display:grid; grid-template-columns:auto 1fr; align-items:center; gap:6px; font-size:10px; }
+  .bank-grid { display:grid; grid-template-columns: 1fr 0.7fr 1fr; gap:6px; }
+  .money-grid { display:grid; grid-template-columns: repeat(4, 1fr); gap:6px; margin-top:6px; }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  table { width:100%; border-collapse:collapse; margin-top:6px; font-size:10px; }
+  thead th { border:1px solid #000; padding:6px 4px; text-align:center; background:#f2f2f2; }
+  tbody td { border:1px solid #000; padding:4px; }
+  tfoot td { border:1px solid #000; padding:6px 4px; font-weight:700; }
+  .num { text-align:right; }
+  .center { text-align:center; }
+  .controls { display:flex; gap:8px; margin:6px 0 2px; align-items:center; }
+  .controls button { font-size:11px; padding:6px 10px; border:1px solid #111; background:#fff; cursor:pointer; }
+  .hint { font-size:10px; color:#444; }
+  .footer-grid { display:grid; grid-template-columns: 1.1fr 1fr 1fr; gap:6px; margin-top:8px; }
+  .sign { height:40px; }
+  .muted { color:#444; }
+
+  /* Hide selection column & UI-only elements when printing */
+  @media print {
+    .controls, .hint, .sel-col { display: none !important; }
+    input[type="checkbox"] { display:none !important; }
+    /* Hide calendar/clock pickers on date inputs */
+    input[type="date"]::-webkit-calendar-picker-indicator { display:none !important; }
+    input[type="date"] { -webkit-appearance: none; appearance: none; }
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <h1 class="title">FACTURA</h1>
+  <div class="num-factura">
+    <label><strong>No.:</strong> <input type="text" placeholder="0001"></label>
+  </div>
+
+  <div class="grid-3">
+    <div class="box">
+      <h5>Suministrador:</h5>
+      <p><input type="text" value="ECV SRL"></p>
+      <h5>DIRECCIÓN:</h5>
+      <p><input type="text" value=""></p>
+      <div class="two" style="margin-top:4px;">
+        <div>
+          <h5>CTA BANCARIA MLC:</h5>
+          <p><input type="text" value=""></p>
+        </div>
+        <div>
+          <h5>CTA BANCARIA CUP:</h5>
+          <p><input type="text" value=""></p>
+        </div>
+      </div>
+    </div>
+    <div class="box">
+      <div class="bank-grid">
+        <div><h5>BANCO</h5><p><input type="text" value="METROPOLITANO"></p></div>
+        <div><h5>SUCURSAL</h5><p><input type="text" value="326"></p></div>
+        <div><h5>NIT</h5><p><input type="text" value="50004322698"></p></div>
+      </div>
+      <div class="money-grid">
+        <div><h5>MONEDA</h5><p class="muted">CUP / USD</p></div>
+        <div><h5>CRÉDITO</h5><p><input type="text" value=""></p></div>
+        <div><h5>EFECTIVO</h5><p><input type="text" value=""></p></div>
+        <div><h5>TRANSFERENCIA</h5><p><input type="text" value=""></p></div>
+      </div>
+    </div>
+    <div class="datebox">
+      <div><strong>FECHA:</strong></div>
+      <div><input type="date" id="fecha"></div>
+    </div>
+  </div>
+
+  <div class="two" style="margin-top:6px;">
+    <div class="box">
+      <h5>ALMACÉN DE ENTREGA</h5>
+      <div class="two">
+        <div>
+          <h5>DIRECCIÓN:</h5>
+          <p><input type="text" value="Cultura"></p>
+        </div>
+        <div>
+          <h5>TELÉFONO</h5>
+          <p><input type="text" value="8612527339"></p>
+        </div>
+      </div>
+    </div>
+    <div class="box">
+      <h5>CLIENTE</h5>
+      <div class="two">
+        <div>
+          <h5>Nombre:</h5>
+          <p><input type="text" id="cliente" value="Roiman Suarez Cartas"></p>
+        </div>
+        <div>
+          <h5>DIRECCIÓN:</h5>
+          <p><input type="text" value="Boyeros"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button type="button" id="btnPrint">Imprimir / PDF</button>
+    <span class="hint">Sugerencia: Ctrl/Cmd+P. Móvil: menú ⋮ → Imprimir.</span>
+  </div>
+
+  <table id="items">
+    <thead>
+      <tr>
+        <th style="width:12%;">CÓDIGO</th>
+        <th>DESCRIPCIÓN</th>
+        <th style="width:7%;">U/M</th>
+        <th style="width:8%;">CTDAD</th>
+        <th style="width:12%;">MN (Precio)</th>
+        <th style="width:14%;">IMPORTE</th>
+        <th class="sel-col" style="width:3%;">Sel</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><input type="text"></td>
+        <td><input type="text"></td>
+        <td class="center"><input type="text" value="Uno"></td>
+        <td class="num"><input type="number" step="1" min="0" value="0" oninput="recalc(this)"></td>
+        <td class="num"><input type="number" step="0.01" min="0" value="0" oninput="recalc(this)"></td>
+        <td class="num importe">0.00</td>
+        <td class="center sel-col"><input type="checkbox"></td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="5" class="num">TOTALES</td>
+        <td class="num" id="total">0.00</td>
+        <td class="sel-col"></td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <div class="controls">
+    <button type="button" id="btnAdd">Agregar línea</button>
+    <button type="button" id="btnRemove">Eliminar seleccionadas</button>
+  </div>
+
+  <div class="footer-grid">
+    <div class="box">
+      <h5>ENTREGADO POR:</h5>
+      <div class="sign"></div>
+      <p class="muted">NOMBRE Y FIRMA</p>
+    </div>
+    <div class="box">
+      <div class="two">
+        <div>
+          <h5>FECHA</h5>
+          <p><input type="text" placeholder=""></p>
+        </div>
+        <div>
+          <h5>IDENTIDAD:</h5>
+          <p><input type="text" placeholder=""></p>
+        </div>
+      </div>
+      <div class="two" style="margin-top:4px;">
+        <div>
+          <h5>No. LICENCIA:</h5>
+          <p><input type="text" placeholder=""></p>
+        </div>
+        <div>
+          <h5>RECIBIDO POR:</h5>
+          <p><input type="text" placeholder=""></p>
+        </div>
+      </div>
+    </div>
+    <div class="box">
+      <div class="two">
+        <div>
+          <h5>FIRMA:</h5>
+          <div class="sign"></div>
+        </div>
+        <div>
+          <h5>CHAPA:</h5>
+          <p><input type="text" placeholder=""></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function fmt(n){ return (Math.round(n*100)/100).toFixed(2); }
+function recalc(el){
+  const row = el.closest('tr');
+  const qty = parseFloat(row.querySelectorAll('input[type="number"]')[0].value)||0;
+  const price = parseFloat(row.querySelectorAll('input[type="number"]')[1].value)||0;
+  row.querySelector('.importe').textContent = fmt(qty*price);
+  totalize();
+}
+function totalize(){
+  let s=0; document.querySelectorAll('.importe').forEach(c=>s+=parseFloat(c.textContent)||0);
+  document.getElementById('total').textContent = fmt(s);
+}
+function addRow(){
+  const t=document.querySelector('#items tbody');
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td><input type="text"></td>
+    <td><input type="text"></td>
+    <td class='center'><input type='text' value='Uno'></td>
+    <td class='num'><input type='number' step='1' min='0' value='0' oninput='recalc(this)'></td>
+    <td class='num'><input type='number' step='0.01' min='0' value='0' oninput='recalc(this)'></td>
+    <td class='num importe'>0.00</td>
+    <td class='center sel-col'><input type='checkbox'></td>`;
+  t.appendChild(tr);
+}
+function removeSelected(){
+  document.querySelectorAll('#items tbody tr').forEach(r=>{const cb=r.querySelector('.sel-col input[type="checkbox"]'); if(cb&&cb.checked)r.remove();});
+  totalize();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const f=document.getElementById('fecha');
+  if(f&&!f.value){
+    const d=new Date();
+    f.value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+  totalize();
+
+  document.getElementById('btnPrint').addEventListener('click', () => setTimeout(()=>window.print(), 0));
+  document.getElementById('btnAdd').addEventListener('click', addRow);
+  document.getElementById('btnRemove').addEventListener('click', removeSelected);
+});
+</script>
+</body>
+</html>
