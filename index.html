@@ -29,7 +29,7 @@
   thead th { border:1px solid #000; padding:6px 4px; text-align:center; background:#f2f2f2; }
   tbody td { border:1px solid #000; padding:4px; }
   tfoot td { border:1px solid #000; padding:6px 4px; font-weight:700; }
-  .num { text-align:right; }
+  .num { text-align:center; }
   .center { text-align:center; }
   .controls { display:flex; gap:8px; margin:6px 0 2px; align-items:center; flex-wrap:wrap; }
   .controls button { font-size:11px; padding:6px 10px; border:1px solid #111; background:#fff; cursor:pointer; }
@@ -325,20 +325,23 @@ function importFromPaste(text){
   for (let i = startIndex; i < lines.length; i++){
     const cols = splitRow(lines[i]);
 
-    // Según tu ejemplo: 0=código, 1=producto/descripcion, 3=p.venta
-    if (cols.length < 4) continue;
+    // Según tu ejemplo: 0=código, 1=producto/descripcion, 3=p.venta, 6=cantidad(existencia)
+    if (cols.length < 7) continue;
 
     const codigo = (cols[0] || "").trim();
     const descripcion = (cols[1] || "").trim();
     const pVenta = parseMoney(cols[3]);
 
-    // Solo aceptar si trae los 3 datos clave
+    // ✅ cantidad desde columna 6 (índice 6). Quita comas por si viene "1,000"
+    const qty = parseFloat(String(cols[6] || "").replace(/,/g, "").trim()) || 1;
+
+    // Solo aceptar si trae los datos clave
     if (!codigo || !descripcion || pVenta <= 0) continue;
 
     // Precio de la factura = P.Venta - 20%
     const price = +(pVenta * 0.80).toFixed(2);
 
-    addRowWithData({ codigo, descripcion, qty: 1, price });
+    addRowWithData({ codigo, descripcion, qty, price });
     count++;
   }
 
