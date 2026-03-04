@@ -31,16 +31,17 @@
   tfoot td { border:1px solid #000; padding:6px 4px; font-weight:700; }
   .num { text-align:right; }
   .center { text-align:center; }
-  .controls { display:flex; gap:8px; margin:6px 0 2px; align-items:center; }
+  .controls { display:flex; gap:8px; margin:6px 0 2px; align-items:center; flex-wrap:wrap; }
   .controls button { font-size:11px; padding:6px 10px; border:1px solid #111; background:#fff; cursor:pointer; }
   .hint { font-size:10px; color:#444; }
   .footer-grid { display:grid; grid-template-columns: 1.1fr 1fr 1fr; gap:6px; margin-top:8px; }
   .sign { height:40px; }
   .muted { color:#444; }
+  textarea { border:1px solid #000; padding:6px; outline:none; resize:vertical; }
 
   /* Hide selection column & UI-only elements when printing */
   @media print {
-    .controls, .hint, .sel-col { display: none !important; }
+    .controls, .hint, .sel-col, .paste-wrap { display: none !important; }
     input[type="checkbox"] { display:none !important; }
     /* Hide calendar/clock pickers on date inputs */
     input[type="date"]::-webkit-calendar-picker-indicator { display:none !important; }
@@ -125,6 +126,21 @@
     <span class="hint">Sugerencia: Ctrl/Cmd+P. Móvil: menú ⋮ → Imprimir.</span>
   </div>
 
+  <!-- PEGADO / IMPORTACIÓN (UI) -->
+  <div class="box paste-wrap" style="margin-top:6px;">
+    <h5>PEGAR LISTADO (Excel / POS)</h5>
+    <textarea id="pasteArea" rows="7" style="width:100%; font-size:10px;"
+      placeholder="Pega aquí una tabla como Excel:
+Código    Producto    P. Costo    P. Venta   ...
+(Se tomará: Código + Producto + P. Venta y se aplicará -20% al precio)"></textarea>
+
+    <div class="controls" style="margin:6px 0 0;">
+      <button type="button" id="btnImport">Importar a factura (-20%)</button>
+      <button type="button" id="btnClearPaste">Limpiar</button>
+      <span class="hint">Toma: Código + Descripción + P.Venta. Precio en factura = P.Venta * 0.80</span>
+    </div>
+  </div>
+
   <table id="items">
     <thead>
       <tr>
@@ -207,6 +223,7 @@
 
 <script>
 function fmt(n){ return (Math.round(n*100)/100).toFixed(2); }
+
 function recalc(el){
   const row = el.closest('tr');
   const qty = parseFloat(row.querySelectorAll('input[type="number"]')[0].value)||0;
@@ -214,10 +231,13 @@ function recalc(el){
   row.querySelector('.importe').textContent = fmt(qty*price);
   totalize();
 }
+
 function totalize(){
-  let s=0; document.querySelectorAll('.importe').forEach(c=>s+=parseFloat(c.textContent)||0);
+  let s=0;
+  document.querySelectorAll('.importe').forEach(c=>s+=parseFloat(c.textContent)||0);
   document.getElementById('total').textContent = fmt(s);
 }
+
 function addRow(){
   const t=document.querySelector('#items tbody');
   const tr=document.createElement('tr');
@@ -230,14 +250,105 @@ function addRow(){
     <td class='center sel-col'><input type='checkbox'></td>`;
   t.appendChild(tr);
 }
+
 function removeSelected(){
-  document.querySelectorAll('#items tbody tr').forEach(r=>{const cb=r.querySelector('.sel-col input[type="checkbox"]'); if(cb&&cb.checked)r.remove();});
+  document.querySelectorAll('#items tbody tr').forEach(r=>{
+    const cb=r.querySelector('.sel-col input[type="checkbox"]');
+    if(cb && cb.checked) r.remove();
+  });
   totalize();
 }
 
+/* ====== IMPORTACIÓN DESDE TEXTO PEGADO (respeta tu lógica) ====== */
+function escapeHtml(s){
+  return String(s ?? "")
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+
+function parseMoney(value){
+  // "$1,100.00" -> 1100
+  const cleaned = String(value || "")
+    .replace(/\$/g, "")
+    .replace(/,/g, "")
+    .trim();
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function splitRow(line){
+  // Excel normalmente pega con TABs
+  if (line.includes("\t")) return line.split("\t");
+  // fallback: separar por 2+ espacios
+  return line.trim().split(/\s{2,}/);
+}
+
+function addRowWithData({codigo, descripcion, um="Uno", qty=1, price=0}){
+  const t = document.querySelector('#items tbody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input type="text" value="${escapeHtml(codigo)}"></td>
+    <td><input type="text" value="${escapeHtml(descripcion)}"></td>
+    <td class="center"><input type="text" value="${escapeHtml(um)}"></td>
+    <td class="num"><input type="number" step="1" min="0" value="${qty}" oninput="recalc(this)"></td>
+    <td class="num"><input type="number" step="0.01" min="0" value="${price}" oninput="recalc(this)"></td>
+    <td class="num importe">0.00</td>
+    <td class="center sel-col"><input type="checkbox"></td>
+  `;
+  t.appendChild(tr);
+  recalc(tr.querySelector('input[type="number"]')); // calcula importe y total
+}
+
+function importFromPaste(text){
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (!lines.length) return 0;
+
+  // Sugerencia: si hay una única fila vacía inicial, eliminarla antes de importar
+  const rows = document.querySelectorAll('#items tbody tr');
+  if (rows.length === 1) {
+    const inputs = rows[0].querySelectorAll('input[type="text"], input[type="number"]');
+    const allEmptyOrZero = Array.from(inputs).every(inp => (inp.value || "0") === "0" || inp.value === "");
+    if (allEmptyOrZero) rows[0].remove();
+  }
+
+  // Saltar encabezado si aparece
+  const first = lines[0].toLowerCase();
+  const startIndex = ((first.includes("código") || first.includes("codigo")) && first.includes("producto"))
+    ? 1
+    : 0;
+
+  let count = 0;
+
+  for (let i = startIndex; i < lines.length; i++){
+    const cols = splitRow(lines[i]);
+
+    // Según tu ejemplo: 0=código, 1=producto/descripcion, 3=p.venta
+    if (cols.length < 4) continue;
+
+    const codigo = (cols[0] || "").trim();
+    const descripcion = (cols[1] || "").trim();
+    const pVenta = parseMoney(cols[3]);
+
+    // Solo aceptar si trae los 3 datos clave
+    if (!codigo || !descripcion || pVenta <= 0) continue;
+
+    // Precio de la factura = P.Venta - 20%
+    const price = +(pVenta * 0.80).toFixed(2);
+
+    addRowWithData({ codigo, descripcion, qty: 1, price });
+    count++;
+  }
+
+  return count;
+}
+
+/* ====== INIT ====== */
 document.addEventListener('DOMContentLoaded', () => {
   const f=document.getElementById('fecha');
-  if(f&&!f.value){
+  if(f && !f.value){
     const d=new Date();
     f.value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   }
@@ -246,6 +357,25 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnPrint').addEventListener('click', () => setTimeout(()=>window.print(), 0));
   document.getElementById('btnAdd').addEventListener('click', addRow);
   document.getElementById('btnRemove').addEventListener('click', removeSelected);
+
+  // Importación
+  const pasteArea = document.getElementById('pasteArea');
+  const btnImport = document.getElementById('btnImport');
+  const btnClearPaste = document.getElementById('btnClearPaste');
+
+  if (btnImport) {
+    btnImport.addEventListener('click', () => {
+      const text = pasteArea?.value || "";
+      const n = importFromPaste(text);
+      alert(`Importados ${n} productos a la factura (P.Venta - 20%).`);
+    });
+  }
+
+  if (btnClearPaste) {
+    btnClearPaste.addEventListener('click', () => {
+      if (pasteArea) pasteArea.value = "";
+    });
+  }
 });
 </script>
 </body>
